@@ -23,7 +23,6 @@ library(dplyr)
 result <- fromJSON(file = "data/matchDetails.json")
 
 subextractor <- function(x, id, date, duration) {
-
   return(
     data.frame(
       id = id,
@@ -45,9 +44,10 @@ extractor <- function(match) {
 
   # ignore bugged matches (no match details)
   if (length(match$info$participants) == 10) {
-
     duration <- match$info$gameDuration
-    if (is.null(match))
+    if (!is.null(match$info$gameEndTimestamp)) {
+      duration <- match$info$gameEndTimestamp - match$info$gameStartTimestamp
+    }
 
 
     intermediate_result <- lapply(match$info$participants, function(x) {
@@ -55,7 +55,7 @@ extractor <- function(match) {
         x,
         match$metadata$matchId,
         match$info$gameCreation,
-        duration
+        duration / (60000)
       )
     })
 
@@ -140,6 +140,9 @@ ggplot(eff, aes(x = fct_reorder(champ, -win / total), y = win / total)) +
 ggplot(sautax, aes(x = date, y = duration)) +
   geom_line()
 ```
+
+
+
 
 
 
