@@ -1,0 +1,148 @@
+---
+title: "TP noté - Rapport"
+author: "Nils Ponsard"
+date: "24/05/2022"
+output: html_document
+---
+
+# TP noté - Rapport
+
+L’objectif est d’analyser les données des matchs de league of legends auquels j’ai participé, récupéré depuis l’api officielle. Le script Deno pour récupérer les données est disponible dans le dossier data. 
+Les données représentent 981 matchs depuis le 17 Mai 2021.
+
+## initialisation
+
+```{r}
+library(ggplot2)
+library(rjson)
+library(tidyr)
+library(dplyr)
+```
+## Lecture des données
+```{r}
+result <- fromJSON(file = "data/matchDetails.json")
+
+subextractor <- function(x, id, date, duration) {
+
+  return(
+    data.frame(
+      id = id,
+      name = x$summonerName,
+      champ = x$championName,
+      lane = x$lane,
+      kills = x$kills,
+      win = x$win,
+      assits = x$assists,
+      deaths = x$deaths,
+      team_id = x$teamId,
+      duration = duration,
+      date = as.Date(as.POSIXct(date / 1000, origin = "1970-01-01"))
+    )
+  )
+}
+
+extractor <- function(match) {
+
+  # ignore bugged matches (no match details)
+  if (length(match$info$participants) == 10) {
+
+    duration <- match$info$gameDuration
+    if (is.null(match))
+
+
+    intermediate_result <- lapply(match$info$participants, function(x) {
+      subextractor(
+        x,
+        match$metadata$matchId,
+        match$info$gameCreation,
+        duration
+      )
+    })
+
+    return(
+      do.call(
+        rbind, intermediate_result
+      )
+    )
+  }
+}
+
+extractor_result <- lapply(result, extractor)
+data <- do.call(rbind, extractor_result)
+
+dim(data)
+head(data)
+```
+
+
+
+Nombre de parties jouées en commun, ici on peut faire varier les bornes de temps :
+```{r}
+
+without <- subset(data, !name %in% c("sautax"))
+
+apparition <- table(without$name)
+
+
+
+a <- apparition[apparition > 2]
+
+d <- data.frame(name = names(a), count = as.vector(a))
+
+ggplot(d, aes(y = fct_reorder(name, count), x = count)) +
+  geom_bar(stat = "identity")
+```
+
+Nombre de parties que j’ai jouées par champion :
+```{r}
+
+sautax <- subset(data, name %in% c("sautax"))
+champions <- table(sautax$champ)
+
+champions_dataframe <- data.frame(
+  name = names(champions),
+  count = as.vector(champions)
+)
+
+
+
+ggplot(champions_dataframe, aes(y = fct_reorder(name, count), x = count)) +
+  geom_bar(stat = "identity")
+```
+
+Version en pourcentages : 
+```{r}
+ggplot(champions_dataframe, aes(
+  y = fct_reorder(name, count),
+  x = count / nrow(sautax)
+)) +
+  geom_bar(stat = "identity")
+```
+
+Winrate par champion :
+```{r}
+
+# calcul du nombre de victoires et de parties
+# et filtrage des champions avec moins de 3 parties
+
+eff <- sautax %>%
+  group_by(champ) %>%
+  summarise(total = n(), win = sum(win)) %>%
+  filter(total > 2)
+
+
+ggplot(eff, aes(x = fct_reorder(champ, -win / total), y = win / total)) +
+  geom_bar(stat = "identity")
+```
+
+Évolution du nombres de kills en fonction du temps :
+```{r}
+ggplot(sautax, aes(x = date, y = duration)) +
+  geom_line()
+```
+
+
+
+
+
+
