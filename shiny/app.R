@@ -78,7 +78,7 @@ ui <- fluidPage(
     # Sidebar with a slider input for number of bins
     sidebarLayout(
         sidebarPanel(
-            sliderInput("DatesMerge",
+            sliderInput("datesMerge",
                 "Dates considérées",
                 min = match_data$date[[nrow(match_data)]],
                 max = match_data$date[[1]],
@@ -139,17 +139,26 @@ server <- function(input, output) {
             match_data$date >= input$datesMerge[1] &
                 match_data$date <= input$datesMerge[2]
         )
-        without <- subset(match_data_sub, !name %in% c("sautax"))
+
+        without <- subset(
+            match_data_sub,
+            name != "sautax"
+        )
+        sub_match_count <- nrow(subset(match_data_sub, name == "sautax"))
 
         apparition <- table(without$name)
 
-        a <- apparition[apparition > 3]
+        apparition <- apparition[apparition > 3]
 
-        d <- data.frame(name = names(a), count = as.vector(a))
+        out <- data.frame(
+            name = names(apparition),
+            count = as.vector(apparition)
+        )
 
-        ggplot(d, aes(
+        ggplot(out, aes(
             y = fct_reorder(name, count),
-            x = (count / match_count) * 100, fill = name
+            x = (count / sub_match_count) * 100,
+            fill = name
         )) +
             theme_minimal() +
             labs(
@@ -159,7 +168,7 @@ server <- function(input, output) {
             theme(legend.position = "none") +
             geom_bar(stat = "identity") +
             geom_text(aes(
-                label = paste(round((count / match_count) * 100, 0),
+                label = paste(round((count / sub_match_count) * 100, 0),
                     "%",
                     sep = ""
                 ),
