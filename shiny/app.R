@@ -16,7 +16,7 @@ library(colorspace)
 library(forcats)
 library(ggforce)
 
-result <- fromJSON(file = "../data/matchDetails.json")
+result <- fromJSON(file = "./data/matchDetails.json")
 
 subextractor <- function(x, id, date, duration) {
     return(
@@ -323,32 +323,20 @@ server <- function(input, output) {
                     origin = "1970-01-01"
                 ))
 
-                if (date <= input$datesMerge[1] & date >= input$datesMerge[2]) {
+                if (date <= input$datesMerge[1] | date >= input$datesMerge[2]) {
                     return()
                 }
 
-                splitted_version <- strsplit(match$info$gameVersion,
-                    split = "\\."
-                )[[1]]
 
-                intermediate_result <- lapply(
-                    match$info$participants,
-                    function(x) {
-                        data.frame(
-                            id = match$metadata$matchId,
-                            duration = duration / (60000),
-                            # on garde que les deux premiers numéros de la version
-                            version = paste(splitted_version[[1]],
-                                splitted_version[[2]],
-                                sep = "."
-                            )
-                        )
-                    }
-                )
 
                 return(
-                    do.call(
-                        rbind, intermediate_result
+                    data.frame(
+                        id = match$metadata$matchId,
+                        duration = duration / (60000),
+                        # on garde que le premier numéro de la version
+                        version = strsplit(match$info$gameVersion,
+                            split = "\\."
+                        )[[1]][[1]]
                     )
                 )
             }
@@ -369,8 +357,6 @@ server <- function(input, output) {
 
     output$version_minor_bar_plot <- renderPlot({
         duration_extractor <- function(match) {
-
-
             # ignore bugged matches (no match details)
             if (length(match$info$participants) == 10) {
                 duration <- match$info$gameDuration
@@ -383,27 +369,24 @@ server <- function(input, output) {
                     origin = "1970-01-01"
                 ))
 
-                if (date <= input$datesMerge[1] & date >= input$datesMerge[2]) {
+                if (date <= input$datesMerge[1] | date >= input$datesMerge[2]) {
                     return()
                 }
 
-                intermediate_result <- lapply(
-                    match$info$participants,
-                    function(x) {
-                        data.frame(
-                            id = match$metadata$matchId,
-                            duration = duration / (60000),
-                            # on garde que le premier numéro de la version
-                            version = strsplit(match$info$gameVersion,
-                                split = "\\."
-                            )[[1]][[1]]
-                        )
-                    }
-                )
+                splitted_version <- strsplit(match$info$gameVersion,
+                    split = "\\."
+                )[[1]]
+
 
                 return(
-                    do.call(
-                        rbind, intermediate_result
+                    data.frame(
+                        id = match$metadata$matchId,
+                        duration = duration / (60000),
+                        # on garde que les deux premiers numéros de la version
+                        version = paste(splitted_version[[1]],
+                            splitted_version[[2]],
+                            sep = "."
+                        )
                     )
                 )
             }
