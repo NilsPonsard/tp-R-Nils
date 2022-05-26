@@ -81,8 +81,8 @@ extractor <- function(match) {
 }
 
 extractor_result <- lapply(result, extractor)
-data <- do.call(rbind, extractor_result)
-sautax_rows <- subset(data, name %in% c("sautax"))
+match_data <- do.call(rbind, extractor_result)
+sautax_rows <- subset(match_data, name %in% c("sautax"))
 match_count <- nrow(sautax_rows)
 ```
 
@@ -96,7 +96,7 @@ Il y a un problème avec ces données : les joueurs peuvent se renommer entre de
 
 ```{r}
 
-without <- subset(data, !name %in% c("sautax"))
+without <- subset(match_data, !name %in% c("sautax"))
 
 apparition <- table(without$name)
 
@@ -128,7 +128,7 @@ Question : quels champions je choisis le plus souvent ?
 
 ```{r}
 
-champions <- table(sautax$champ)
+champions <- table(sautax_rows$champ)
 
 champions_dataframe <- data.frame(
   name = names(champions),
@@ -213,7 +213,7 @@ Pour que les résultats aient du sens on enlève les champions que j’ai joué 
 # calcul du nombre de victoires et de parties
 # et filtrage des champions avec moins de 5 parties
 
-eff <- sautax %>%
+eff <- sautax_rows %>%
   group_by(champ) %>%
   summarise(total = n(), win = sum(win)) %>%
   filter(total >= 5)
@@ -289,7 +289,8 @@ ggplot(duration_data, aes(x = version, y = duration)) +
     x = "Version du jeu",
     y = "Durée de la partie (minutes)",
     title = "Durée de la partie en fonction de la version du jeu"
-  )
+  ) +
+  theme_minimal()
 ```
 Un boxplot / boîte à moustaches permet de bie représenter la distribution des durées de partie en fonction de la version.
 
@@ -309,14 +310,17 @@ duration_extractor <- function(match) {
       duration <- match$info$gameEndTimestamp - match$info$gameStartTimestamp
     }
 
-    splitted_version <- strsplit( match$info$gameVersion, split = "\\.")[[1]]
+    splitted_version <- strsplit(match$info$gameVersion, split = "\\.")[[1]]
 
     intermediate_result <- lapply(match$info$participants, function(x) {
       data.frame(
         id = match$metadata$matchId,
         duration = duration / (60000),
         # on garde que les deux premiers numéros de la version
-        version = paste( splitted_version[[1]],splitted_version[[2]], sep = "." )
+        version = paste(splitted_version[[1]],
+          splitted_version[[2]],
+          sep = "."
+        )
       )
     })
 
@@ -337,5 +341,6 @@ ggplot(duration_data, aes(x = version, y = duration)) +
     x = "Version du jeu",
     y = "Durée de la partie (minutes)",
     title = "Durée de la partie en fonction de la version du jeu"
-  )
+  ) +
+  theme_minimal()
 ```
