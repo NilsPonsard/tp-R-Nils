@@ -65,8 +65,6 @@ extractor <- function(match) {
 
 extractor_result <- lapply(result, extractor)
 match_data <- do.call(rbind, extractor_result)
-sautax_rows <- subset(match_data, name %in% c("sautax"))
-match_count <- nrow(sautax_rows)
 
 
 # Define UI for application that draws a histogram
@@ -173,6 +171,140 @@ server <- function(input, output) {
                     sep = ""
                 ),
             ), hjust = -0.02)
+    })
+
+    output$champ_bar_plot <- renderPlot({
+        match_data_sub <- subset(
+            match_data,
+            match_data$date >= input$datesMerge[1] &
+                match_data$date <= input$datesMerge[2]
+        )
+        sautax_rows <- subset(match_data_sub, name %in% c("sautax"))
+        match_count <- nrow(sautax_rows)
+
+
+        champions <- table(sautax_rows$champ)
+
+        champions_dataframe <- data.frame(
+            name = names(champions),
+            count = as.vector(champions)
+        )
+
+        filtered <- champions_dataframe %>%
+            filter(count >= 5)
+
+        ggplot(
+            filtered,
+            aes(
+                y = fct_reorder(name, count), x = (count / match_count) * 100,
+                fill = count
+            )
+        ) +
+            theme_minimal() +
+            labs(
+                x = "Fréquence d'apparition (%)", y = "Nom du champion",
+                title = "Pourcentage de parties jouées par champion"
+            ) +
+            theme(legend.position = "none") +
+            geom_bar(stat = "identity") +
+            geom_text(aes(
+                label = paste(round((count / match_count) * 100, 0), "%", sep = "")
+            ), hjust = 0)
+    })
+    output$champ_wr_bar_plot <- renderPlot({
+        match_data_sub <- subset(
+            match_data,
+            match_data$date >= input$datesMerge[1] &
+                match_data$date <= input$datesMerge[2]
+        )
+        sautax_rows <- subset(match_data_sub, name %in% c("sautax"))
+        match_count <- nrow(sautax_rows)
+
+        eff <- sautax_rows %>%
+            group_by(champ) %>%
+            summarise(total = n(), win = sum(win)) %>%
+            filter(total >= 5)
+
+        ggplot(
+            eff,
+            aes(
+                y = fct_reorder(champ, -win / total),
+                x = (win / total) * 100, fill = (win / total)
+            )
+        ) +
+            geom_bar(stat = "identity") +
+            theme_minimal() +
+            labs(
+                y = "Nom du champion",
+                x = "Taux de victoire (%)",
+                title = "Taux de victoir par champion joué"
+            ) +
+            theme(legend.position = "none") +
+            scale_fill_continuous_diverging(
+                palette = "Blue-Red",
+                rev = TRUE,
+                mid = 0.5
+            ) +
+            geom_text(aes(
+                label = paste(round((win / total) * 100, digits = 1),
+                    "%",
+                    sep = ""
+                ),
+                x = 0.005,
+                hjust = 0,
+            ))
+    })
+    output$champ_pie_plot <- renderPlot({
+        match_data_sub <- subset(
+            match_data,
+            match_data$date >= input$datesMerge[1] &
+                match_data$date <= input$datesMerge[2]
+        )
+        sautax_rows <- subset(match_data_sub, name %in% c("sautax"))
+        match_count <- nrow(sautax_rows)
+
+        champions <- table(sautax_rows$champ)
+
+        champions_dataframe <- data.frame(
+            name = names(champions),
+            count = as.vector(champions)
+        )
+        pie_filtered <- champions_dataframe %>%
+            filter(count >= 20)
+        other_count <- match_count - sum(pie_filtered$count)
+
+        pie_filtered <- rbind(
+            pie_filtered,
+            data.frame(
+                name = "Autres",
+                count = other_count
+            )
+        )
+
+        pie_filtered <- arrange(pie_filtered, count)
+
+
+        ggplot(
+            pie_filtered,
+            aes(
+                x = "", y = count,
+                fill = fct_reorder(name, count)
+            )
+        ) +
+            theme_minimal() +
+            labs(
+                x = NULL, y = NULL,
+                title = "Pourcentage de parties jouées par champion",
+                fill = "Champion"
+            ) +
+            theme_void() +
+            geom_bar(width = 1, size = 1, color = "white", stat = "identity") +
+            coord_polar("y", start = 0) +
+            guides(fill = guide_legend(reverse = TRUE)) +
+            geom_text(aes(label = round((count / match_count) * 100, 0)),
+                position = position_stack(vjust = 0.5)
+            ) +
+            scale_fill_brewer(palette = "Set3")
     })
 }
 
