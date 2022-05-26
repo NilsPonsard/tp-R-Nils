@@ -306,6 +306,121 @@ server <- function(input, output) {
             ) +
             scale_fill_brewer(palette = "Set3")
     })
+
+    output$version_major_bar_plot <- renderPlot({
+        duration_extractor <- function(match) {
+
+
+            # ignore bugged matches (no match details)
+            if (length(match$info$participants) == 10) {
+                duration <- match$info$gameDuration
+                if (!is.null(match$info$gameEndTimestamp)) {
+                    duration <- match$info$gameEndTimestamp -
+                        match$info$gameStartTimestamp
+                }
+
+                date <- as.Date(as.POSIXct(match$info$gameCreation / 1000,
+                    origin = "1970-01-01"
+                ))
+
+                if (date <= input$datesMerge[1] & date >= input$datesMerge[2]) {
+                    return()
+                }
+
+                splitted_version <- strsplit(match$info$gameVersion,
+                    split = "\\."
+                )[[1]]
+
+                intermediate_result <- lapply(
+                    match$info$participants,
+                    function(x) {
+                        data.frame(
+                            id = match$metadata$matchId,
+                            duration = duration / (60000),
+                            # on garde que les deux premiers numéros de la version
+                            version = paste(splitted_version[[1]],
+                                splitted_version[[2]],
+                                sep = "."
+                            )
+                        )
+                    }
+                )
+
+                return(
+                    do.call(
+                        rbind, intermediate_result
+                    )
+                )
+            }
+        }
+
+        duration_result <- lapply(result, duration_extractor)
+        duration_data <- do.call(rbind, duration_result)
+
+        ggplot(duration_data, aes(x = version, y = duration)) +
+            geom_boxplot() +
+            labs(
+                x = "Version du jeu",
+                y = "Durée de la partie (minutes)",
+                title = "Durée de la partie en fonction de la version du jeu"
+            ) +
+            theme_minimal()
+    })
+
+    output$version_minor_bar_plot <- renderPlot({
+        duration_extractor <- function(match) {
+
+
+            # ignore bugged matches (no match details)
+            if (length(match$info$participants) == 10) {
+                duration <- match$info$gameDuration
+                if (!is.null(match$info$gameEndTimestamp)) {
+                    duration <- match$info$gameEndTimestamp -
+                        match$info$gameStartTimestamp
+                }
+
+                date <- as.Date(as.POSIXct(match$info$gameCreation / 1000,
+                    origin = "1970-01-01"
+                ))
+
+                if (date <= input$datesMerge[1] & date >= input$datesMerge[2]) {
+                    return()
+                }
+
+                intermediate_result <- lapply(
+                    match$info$participants,
+                    function(x) {
+                        data.frame(
+                            id = match$metadata$matchId,
+                            duration = duration / (60000),
+                            # on garde que le premier numéro de la version
+                            version = strsplit(match$info$gameVersion,
+                                split = "\\."
+                            )[[1]][[1]]
+                        )
+                    }
+                )
+
+                return(
+                    do.call(
+                        rbind, intermediate_result
+                    )
+                )
+            }
+        }
+
+        duration_result <- lapply(result, duration_extractor)
+        duration_data <- do.call(rbind, duration_result)
+
+        ggplot(duration_data, aes(x = version, y = duration)) +
+            geom_boxplot() +
+            labs(
+                x = "Version du jeu",
+                y = "Durée de la partie (minutes)",
+                title = "Durée de la partie en fonction de la version du jeu"
+            ) +
+            theme_minimal()
+    })
 }
 
 # Run the application
