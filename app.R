@@ -270,7 +270,7 @@ server <- function(input, output) {
             count = as.vector(champions)
         )
         pie_filtered <- champions_dataframe %>%
-            filter(count >= 20)
+            filter((count / match_count) >= 0.02)
         other_count <- match_count - sum(pie_filtered$count)
 
         pie_filtered <- rbind(
