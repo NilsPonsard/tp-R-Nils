@@ -7,21 +7,31 @@ output: html_document
 
 # TP noté - Rapport
 
-L’objectif est d’analyser les données des matchs de league of legends auquels j’ai participé, récupéré depuis l’api officielle. Le script Deno pour récupérer les données est disponible dans le dossier data. 
-Les données représentent 981 matchs du 17 Mai 2021 au 21 Mai 2022.
-library(colorspace)
+League of Legends est un jeu vidéo de type MOBA développé par Riot Games où 2 équipes de 5 joueurs s’affrontent, chaque joueur joue un champion (un personnage) différent des autres joueurs de la partie.
+
+Je joue fréquemment à ce jeu et je profite de ce TP pour analyser mes parties et mes résultats.
+
+L’objectif est d’analyser les données des matchs de League of Legends auquels j’ai participé, récupéré depuis l’api officielle de Riot Games. Le script Deno pour récupérer les données est disponible dans le dossier data. 
+
+Les données représentent 981 matchs joués entre le 17 Mai 2021 et le 21 Mai 2022.
 
 ## initialisation
 
-```{r}
+On importe les modules nécessaires pour l’analyse des données.
+
+```{r, message = FALSE}
 library(ggplot2)
 library(rjson)
 library(tidyr)
 library(dplyr)
 library(colorspace)
 library(forcats)
+library(ggforce)
 ```
 ## Lecture des données
+
+On lis et on extrait les données du fichier au format JSON, il y a quelques matchs qui n’ont pas d’informations, on les ignore.
+
 ```{r}
 result <- fromJSON(file = "data/matchDetails.json")
 
@@ -72,37 +82,52 @@ extractor <- function(match) {
 
 extractor_result <- lapply(result, extractor)
 data <- do.call(rbind, extractor_result)
-
-dim(data)
-head(data)
+sautax_rows <- subset(data, name %in% c("sautax"))
+match_count <- nrow(sautax_rows)
 ```
 
+## Pourcentage de parties jouées avec un contact
 
+Le jeu étant un jeu d’équipe on peut lancer des parties dans un "lobby" pour se retrouver dans la même équipe.
 
-Nombre de parties jouées en commun, ici on peut faire varier les bornes de temps :
+La question est : à quelle fréquence je joue avec chaqun de mes contacts ?
+
+Il y a un problème avec ces données : les joueurs peuvent se renommer entre deux parties, il y a par exemple un de mes amis qui c’est renommé de Héracless à CobAltF4.
+
 ```{r}
 
 without <- subset(data, !name %in% c("sautax"))
 
 apparition <- table(without$name)
 
-
-
-a <- apparition[apparition > 2]
+a <- apparition[apparition > 3]
 
 d <- data.frame(name = names(a), count = as.vector(a))
 
-ggplot(d, aes(y = fct_reorder(name, count), x = count, fill = name)) +
+ggplot(d, aes(
+  y = fct_reorder(name, count),
+  x = (count / match_count) * 100, fill = name
+)) +
   theme_minimal() +
-  labs(x = "Nombre de parties", y = "Nom du joueur") +
+  labs(
+    x = "Fréquence d’apparition", y = "Nom du joueur",
+    title = "Pourcentage de parties jouées avec un contact"
+  ) +
   theme(legend.position = "none") +
   geom_bar(stat = "identity") +
-  geom_text(aes(label = count), hjust = -0.02)
+  geom_text(aes(
+    label = paste(round((count / match_count) * 100, 0), "%", sep = ""),
+  ), hjust = -0.02)
 ```
 
-Nombre de parties que j’ai jouées par champion :
+Un diagramme en bar permet de facilement comparer ces fréquences. 
+
+## Pourcentage de parties que j’ai joué avec un champion
+
+Question : quels champions je choisis le plus souvent ? 
+
 ```{r}
-sautax <- subset(data, name %in% c("sautax"))
+
 champions <- table(sautax$champ)
 
 champions_dataframe <- data.frame(
@@ -110,30 +135,79 @@ champions_dataframe <- data.frame(
   count = as.vector(champions)
 )
 
+filtered <- champions_dataframe %>%
+  filter(count >= 5)
+
+ggplot(
+  filtered,
+  aes(
+    y = fct_reorder(name, count), x = (count / match_count) * 100,
+    fill = count
+  )
+) +
+  theme_minimal() +
+  labs(
+    x = "Fréquence d'apparition (%)", y = "Nom du champion",
+    title = "Pourcentage de parties jouées par champion"
+  ) +
+  theme(legend.position = "none") +
+  geom_bar(stat = "identity") +
+  geom_text(aes(
+    label = paste(round((count / match_count) * 100, 0), "%", sep = "")
+  ), hjust = 0)
+```
+On peut représenter ces résultats avec un diagramme en bar ou avec un camembert.
+
+```{r}
+
+
+pie_filtered <- champions_dataframe %>%
+  filter(count >= 20)
+other_count <- match_count - sum(pie_filtered$count)
+
+pie_filtered <- rbind(
+  pie_filtered,
+  data.frame(
+    name = "Autres",
+    count = other_count
+  )
+)
+
+pie_filtered <- arrange(pie_filtered, count)
 
 
 ggplot(
-  champions_dataframe,
-  aes(y = fct_reorder(name, count), x = count, fill = name)
+  pie_filtered,
+  aes(
+    x = "", y = count,
+    fill = fct_reorder(name, count)
+  )
 ) +
   theme_minimal() +
-  labs(x = "Nombre de parties", y = "Nom du champion") +
-  theme(legend.position = "none") +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = count), hjust = -0.02)
+  labs(
+    x = NULL, y = NULL,
+    title = "Pourcentage de parties jouées par champion",
+    fill = "Champion"
+  ) +
+  theme_void() +
+  geom_bar(width = 1, size = 1, color = "white", stat = "identity") +
+  coord_polar("y", start = 0) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  geom_text(aes(label = round((count / match_count) * 100, 0)),
+    position = position_stack(vjust = 0.5)
+  ) +
+  scale_fill_brewer(palette = "Set3")
 ```
 
-Version en pourcentages : 
-```{r}
-ggplot(champions_dataframe, aes(
-  y = fct_reorder(name, count),
-  x = count / nrow(sautax),
-  fill = name
-)) +
-  geom_bar(stat = "identity")
-```
+L’affichage en camembert permet de mieux voir la répartition mais on peut affichier moins de champions.
 
-Winrate par champion :
+
+## Taux de victoire par champion :
+
+Question : quel sont les champions qui me donnent le plus de victoires ?
+
+Pour que les résultats aient du sens on enlève les champions que j’ai joué moins de 5 fois, sinon il n’y a pas assez de données récoltés pour que le taux de victoire ait du sens.
+
 ```{r}
 
 # calcul du nombre de victoires et de parties
@@ -149,12 +223,15 @@ ggplot(
   eff,
   aes(
     y = fct_reorder(champ, -win / total),
-    x = (win / total), fill = (win / total)
+    x = (win / total) * 100, fill = (win / total)
   )
 ) +
   geom_bar(stat = "identity") +
   theme_minimal() +
-  labs(y = "Nom du champion", x = "Taux de victoire") +
+  labs(
+    y = "Nom du champion",
+    x = "Taux de victoire (%)", title = "Taux de victoir par champion joué"
+  ) +
   theme(legend.position = "none") +
   scale_fill_continuous_diverging(
     palette = "Blue-Red",
@@ -163,12 +240,18 @@ ggplot(
   ) +
   geom_text(aes(
     label = paste(round((win / total) * 100, digits = 1), "%", sep = ""),
-    x = 0
+    x = 0.005,
+    hjust = 0,
   ))
 ```
 
 
-Évolution de la durée de la partie en fonction de la version :
+## Évolution de la durée de la partie en fonction de la version :
+
+Avec la version 12 il y a eu un changement qui permet aux équipes qui étaient en retard au niveau de l’argent gagné de rattraper ce retard, ce qui leur permettrai d’avoir plus de chance de reprendre l’avantage et de gagner le match. 
+
+Je pensais que ce changement rallongerait la durée d’une partie, c’est ce que je veux vérifier avec ce graphe.
+
 ```{r}
 
 duration_extractor <- function(match) {
@@ -180,12 +263,12 @@ duration_extractor <- function(match) {
       duration <- match$info$gameEndTimestamp - match$info$gameStartTimestamp
     }
 
-
     intermediate_result <- lapply(match$info$participants, function(x) {
       data.frame(
         id = match$metadata$matchId,
         duration = duration / (60000),
-        version = match$info$gameVersion
+        # on garde que le premier numéro de la version
+        version = strsplit(match$info$gameVersion, split = "\\.")[[1]][[1]]
       )
     })
 
@@ -201,5 +284,58 @@ duration_result <- lapply(result, duration_extractor)
 duration_data <- do.call(rbind, duration_result)
 
 ggplot(duration_data, aes(x = version, y = duration)) +
-  geom_boxplot()
+  geom_boxplot() +
+  labs(
+    x = "Version du jeu",
+    y = "Durée de la partie (minutes)",
+    title = "Durée de la partie en fonction de la version du jeu"
+  )
+```
+Un boxplot / boîte à moustaches permet de bie représenter la distribution des durées de partie en fonction de la version.
+
+Il s’avère que ces données invalide mon hypothèse : la médiane et les quartiles sont  à peu près les mêmes, je m’attendais à un changement plus prononcé.
+
+
+
+On peut aussi s’intéresser aux versions mineures :
+```{r}
+
+duration_extractor <- function(match) {
+
+  # ignore bugged matches (no match details)
+  if (length(match$info$participants) == 10) {
+    duration <- match$info$gameDuration
+    if (!is.null(match$info$gameEndTimestamp)) {
+      duration <- match$info$gameEndTimestamp - match$info$gameStartTimestamp
+    }
+
+    splitted_version <- strsplit( match$info$gameVersion, split = "\\.")[[1]]
+
+    intermediate_result <- lapply(match$info$participants, function(x) {
+      data.frame(
+        id = match$metadata$matchId,
+        duration = duration / (60000),
+        # on garde que les deux premiers numéros de la version
+        version = paste( splitted_version[[1]],splitted_version[[2]], sep = "." )
+      )
+    })
+
+    return(
+      do.call(
+        rbind, intermediate_result
+      )
+    )
+  }
+}
+
+duration_result <- lapply(result, duration_extractor)
+duration_data <- do.call(rbind, duration_result)
+
+ggplot(duration_data, aes(x = version, y = duration)) +
+  geom_boxplot() +
+  labs(
+    x = "Version du jeu",
+    y = "Durée de la partie (minutes)",
+    title = "Durée de la partie en fonction de la version du jeu"
+  )
 ```
