@@ -8,7 +8,8 @@ output: html_document
 # TP noté - Rapport
 
 L’objectif est d’analyser les données des matchs de league of legends auquels j’ai participé, récupéré depuis l’api officielle. Le script Deno pour récupérer les données est disponible dans le dossier data. 
-Les données représentent 981 matchs depuis le 17 Mai 2021.
+Les données représentent 981 matchs du 17 Mai 2021 au 21 Mai 2022.
+library(colorspace)
 
 ## initialisation
 
@@ -17,6 +18,8 @@ library(ggplot2)
 library(rjson)
 library(tidyr)
 library(dplyr)
+library(colorspace)
+library(forcats)
 ```
 ## Lecture des données
 ```{r}
@@ -89,13 +92,16 @@ a <- apparition[apparition > 2]
 
 d <- data.frame(name = names(a), count = as.vector(a))
 
-ggplot(d, aes(y = fct_reorder(name, count), x = count)) +
-  geom_bar(stat = "identity")
+ggplot(d, aes(y = fct_reorder(name, count), x = count, fill = name)) +
+  theme_minimal() +
+  labs(x = "Nombre de parties", y = "Nom du joueur") +
+  theme(legend.position = "none") +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = count), hjust = -0.02)
 ```
 
 Nombre de parties que j’ai jouées par champion :
 ```{r}
-
 sautax <- subset(data, name %in% c("sautax"))
 champions <- table(sautax$champ)
 
@@ -106,15 +112,23 @@ champions_dataframe <- data.frame(
 
 
 
-ggplot(champions_dataframe, aes(y = fct_reorder(name, count), x = count)) +
-  geom_bar(stat = "identity")
+ggplot(
+  champions_dataframe,
+  aes(y = fct_reorder(name, count), x = count, fill = name)
+) +
+  theme_minimal() +
+  labs(x = "Nombre de parties", y = "Nom du champion") +
+  theme(legend.position = "none") +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = count), hjust = -0.02)
 ```
 
 Version en pourcentages : 
 ```{r}
 ggplot(champions_dataframe, aes(
   y = fct_reorder(name, count),
-  x = count / nrow(sautax)
+  x = count / nrow(sautax),
+  fill = name
 )) +
   geom_bar(stat = "identity")
 ```
@@ -123,29 +137,69 @@ Winrate par champion :
 ```{r}
 
 # calcul du nombre de victoires et de parties
-# et filtrage des champions avec moins de 3 parties
+# et filtrage des champions avec moins de 5 parties
 
 eff <- sautax %>%
   group_by(champ) %>%
   summarise(total = n(), win = sum(win)) %>%
-  filter(total > 2)
+  filter(total >= 5)
 
 
-ggplot(eff, aes(x = fct_reorder(champ, -win / total), y = win / total)) +
-  geom_bar(stat = "identity")
+ggplot(
+  eff,
+  aes(
+    y = fct_reorder(champ, -win / total),
+    x = (win / total), fill = (win / total)
+  )
+) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(y = "Nom du champion", x = "Taux de victoire") +
+  theme(legend.position = "none") +
+  scale_fill_continuous_diverging(
+    palette = "Blue-Red",
+    rev = TRUE,
+    mid = 0.5
+  ) +
+  geom_text(aes(
+    label = paste(round((win / total) * 100, digits = 1), "%", sep = ""),
+    x = 0
+  ))
 ```
 
-Évolution du nombres de kills en fonction du temps :
+
+Évolution de la durée de la partie en fonction de la version :
 ```{r}
-ggplot(sautax, aes(x = date, y = duration)) +
-  geom_line()
+
+duration_extractor <- function(match) {
+
+  # ignore bugged matches (no match details)
+  if (length(match$info$participants) == 10) {
+    duration <- match$info$gameDuration
+    if (!is.null(match$info$gameEndTimestamp)) {
+      duration <- match$info$gameEndTimestamp - match$info$gameStartTimestamp
+    }
+
+
+    intermediate_result <- lapply(match$info$participants, function(x) {
+      data.frame(
+        id = match$metadata$matchId,
+        duration = duration / (60000),
+        version = match$info$gameVersion
+      )
+    })
+
+    return(
+      do.call(
+        rbind, intermediate_result
+      )
+    )
+  }
+}
+
+duration_result <- lapply(result, duration_extractor)
+duration_data <- do.call(rbind, duration_result)
+
+ggplot(duration_data, aes(x = version, y = duration)) +
+  geom_boxplot()
 ```
-
-
-
-
-
-
-
-
-
