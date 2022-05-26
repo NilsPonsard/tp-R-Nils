@@ -5,8 +5,6 @@ date: "24/05/2022"
 output: html_document
 ---
 
-# TP noté - Rapport
-
 League of Legends est un jeu vidéo de type MOBA développé par Riot Games où 2 équipes de 5 joueurs s’affrontent, chaque joueur joue un champion (un personnage) différent des autres joueurs de la partie.
 
 Je joue fréquemment à ce jeu et je profite de ce TP pour analyser mes parties et mes résultats.
